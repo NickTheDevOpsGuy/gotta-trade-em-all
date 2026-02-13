@@ -2,7 +2,7 @@
 
 A React-based trading game inspired by collectible monster card mechanics. Build your collection, add cards from the catalog, and trade to complete your set.
 
-[![Build](https://github.com/YOUR_ORG/gotta-trade-em-all/actions/workflows/build.yml/badge.svg)](https://github.com/YOUR_ORG/gotta-trade-em-all/actions)
+[![Build](https://github.com/NickTheDevOpsGuy/gotta-trade-em-all/actions/workflows/build.yml/badge.svg)](https://github.com/NickTheDevOpsGuy/gotta-trade-em-all/actions)
 
 ## Features
 
