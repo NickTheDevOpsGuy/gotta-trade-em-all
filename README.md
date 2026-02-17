@@ -16,8 +16,8 @@ A React-based trading game inspired by collectible monster card mechanics. Build
 | Layer    | Tech                     |
 | -------- | ------------------------ |
 | Frontend | React 18, TypeScript, Vite |
-| Backend  | Node.js, Express, TypeScript |
-| Database | SQLite (better-sqlite3)   |
+| Backend  | Node.js, Express, TypeScript (dev) / Vercel Serverless (prod) |
+| Database | SQLite (local dev) / Supabase PostgreSQL (deployed) |
 
 ## Quick Start
 
@@ -79,24 +79,64 @@ Serve the frontend `dist/` with any static file server (e.g. `npx serve frontend
 
 ```
 gotta-trade-em-all/
-├── backend/
-│   ├── db/
-│   │   └── schema.sql      # Database schema & seed data
+├── api/                    # Vercel serverless functions (production)
+│   ├── cards.ts
+│   ├── inventory/
+│   │   ├── index.ts
+│   │   └── trade.ts
+│   └── lib/supabase.ts
+├── backend/                 # Express + SQLite (local dev only)
+│   ├── db/schema.sql
 │   └── src/
-│       ├── index.ts        # Express app
-│       ├── db.ts           # SQLite connection
-│       └── routes/
-│           ├── cards.ts    # Card catalog API
-│           └── inventory.ts # Collection & trade API
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   ├── types/
+│   │   ├── contexts/AuthContext.tsx
+│   │   ├── lib/supabase.ts
 │   │   └── components/
 │   └── index.html
-├── docs/                   # Additional documentation
-└── .github/workflows/      # CI/CD
+├── supabase/migrations/     # PostgreSQL schema for Supabase
+├── vercel.json
+├── docs/
+└── .github/workflows/
+```
+
+## Deploy to Vercel + Supabase
+
+### 1. Create a Supabase project
+
+1. Go to [supabase.com](https://supabase.com) and create a project.
+2. In **Authentication** → **Providers**, enable **Anonymous Sign-In**.
+3. Run the migration: in the Supabase SQL Editor, run the contents of `supabase/migrations/20250216000000_initial.sql`.
+4. Copy your project URL and keys from **Settings** → **API**.
+
+### 2. Deploy to Vercel
+
+1. Push your repo to GitHub and import it in [vercel.com](https://vercel.com).
+2. Add environment variables in your Vercel project:
+   - `SUPABASE_URL` — Supabase project URL
+   - `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key (secret)
+   - `VITE_SUPABASE_URL` — same as SUPABASE_URL (used at build time)
+   - `VITE_SUPABASE_ANON_KEY` — Supabase anon/public key
+3. Deploy. Vercel will build the frontend and deploy the API routes.
+
+### 3. Local development with Supabase
+
+```bash
+# Install dependencies
+npm install
+
+# Copy env and fill in Supabase values
+cp .env.example .env.local
+
+# Run with Vercel dev (uses serverless API + Supabase)
+npx vercel dev
+```
+
+Or use the original SQLite backend:
+
+```bash
+npm run dev   # Express backend + frontend
 ```
 
 ## API Reference

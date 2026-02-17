@@ -1,11 +1,12 @@
-
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from './types/card';
 import { CardGrid } from './components/CardGrid';
+import { useAuth } from './contexts/AuthContext';
 
-const API = 'http://localhost:3001/api';
+const API = import.meta.env.VITE_API_URL ?? '/api';
 
 export default function App() {
+  const { token, loading } = useAuth();
   const [cards, setCards] = useState<Card[]>([]);
   const [inventory, setInventory] = useState<Card[]>([]);
   const [tradeSelection, setTradeSelection] = useState<Set<string>>(new Set());
@@ -13,19 +14,23 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(() => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     fetch(`${API}/cards`).then((r) => r.json()).then(setCards);
-    fetch(`${API}/inventory`).then((r) => r.json()).then(setInventory);
+    fetch(`${API}/inventory`, { headers }).then((r) => r.json()).then(setInventory);
     setError(null);
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, token]);
 
   const handleAddCard = useCallback((card: Card) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     fetch(`${API}/inventory`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ card_id: card.id }),
     })
       .then((r) => {
@@ -34,7 +39,7 @@ export default function App() {
       })
       .then(() => fetchData())
       .catch((e) => setError(e.message));
-  }, [fetchData]);
+  }, [fetchData, token]);
 
   const handleToggleTradeSelect = useCallback((card: Card) => {
     setTradeSelection((prev) => {
@@ -52,9 +57,11 @@ export default function App() {
     }
     setTrading(true);
     setError(null);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     fetch(`${API}/inventory/trade`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ offer_card_ids: Array.from(tradeSelection) }),
     })
       .then((r) => {
@@ -67,7 +74,15 @@ export default function App() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setTrading(false));
-  }, [tradeSelection, fetchData]);
+  }, [tradeSelection, fetchData, token]);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#94a3b8' }}>
+        Loading…
+      </div>
+    );
+  }
 
   return (
     <div style={{

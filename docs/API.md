@@ -25,6 +25,8 @@ List all cards in the catalog.
 
 ## Inventory
 
+> **Auth required** — All inventory endpoints require a signed-in user. Include the Supabase JWT in the `Authorization: Bearer <token>` header.
+
 ### GET /inventory
 
 List cards in your collection (with quantities).

@@ -13,7 +13,8 @@
   },
   "workspaces": [
     "frontend",
-    "backend"
+    "backend",
+    "api"
   ],
   "devDependencies": {
     "concurrently": "^8.2.2"

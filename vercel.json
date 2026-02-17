@@ -1,0 +1,11 @@
+{
+  "buildCommand": "npm run build --workspace=frontend",
+  "outputDirectory": "frontend/dist",
+  "framework": null,
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 256,
+      "maxDuration": 10
+    }
+  }
+}
