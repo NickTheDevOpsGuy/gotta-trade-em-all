@@ -113,3 +113,59 @@ Trade selected cards for new ones. You receive cards of similar total value from
 **Errors**
 
 - `400` — Invalid request or insufficient quantity for a card
+- `429` — Too many trades (max 50 per hour per user)
+
+### POST /inventory/import
+
+Bulk import cards into your collection from a JSON export.
+
+**Request**
+
+```json
+{
+  "items": [
+    { "card_id": "001", "quantity": 2 },
+    { "card_id": "004", "quantity": 1 }
+  ]
+}
+```
+
+| Field  | Type   | Required | Description                                      |
+| ------ | ------ | -------- | ------------------------------------------------- |
+| items  | array  | Yes      | 1–100 objects with `card_id` and optional `quantity` |
+
+**Response** (200)
+
+```json
+{ "success": true }
+```
+
+---
+
+## Trades
+
+### GET /trades
+
+List your recent trade history (auth required).
+
+**Query**
+
+| Param  | Type | Default | Description       |
+| ------ | ---- | ------- | ----------------- |
+| limit  | int  | 10      | Max 50 trades     |
+
+**Response**
+
+```json
+{
+  "trades": [
+    {
+      "id": 1,
+      "offered_card_ids": ["001", "002"],
+      "received_card_ids": ["005", "006"],
+      "offered_value": 4,
+      "created_at": "2025-02-17T12:00:00Z"
+    }
+  ]
+}
+```

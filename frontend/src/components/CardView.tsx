@@ -1,5 +1,6 @@
-
+import { motion } from 'framer-motion';
 import { Card } from '../types/card';
+import { getCardIcon } from '../lib/cardIcons';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#94a3b8',
@@ -21,7 +22,12 @@ export function CardView({ card, selected, mode = 'display', onAdd, onToggleSele
   const isAddable = mode === 'add' && onAdd;
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={isSelectable ? { scale: 1.02 } : undefined}
+      transition={{ duration: 0.2 }}
       onClick={isSelectable ? () => onToggleSelect?.(card) : undefined}
       style={{
         border: `2px solid ${selected ? accent : '#334155'}`,
@@ -35,6 +41,9 @@ export function CardView({ card, selected, mode = 'display', onAdd, onToggleSele
         position: 'relative',
       }}
     >
+      <div style={{ fontSize: 28, marginBottom: 8, lineHeight: 1 }}>
+        {getCardIcon(card.id, card.rarity)}
+      </div>
       <div style={{ fontSize: 10, color: accent, textTransform: 'uppercase', marginBottom: 4 }}>
         {card.rarity}
       </div>
@@ -64,6 +73,6 @@ export function CardView({ card, selected, mode = 'display', onAdd, onToggleSele
           + Add to Collection
         </button>
       )}
-    </div>
+    </motion.div>
   );
 }

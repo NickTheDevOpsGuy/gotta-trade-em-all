@@ -1,9 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>document.documentElement.dataset.theme = localStorage.getItem('tradedex-theme') || 'dark';</script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TradeDex</title>
+    <meta name="description" content="TradeDex — A collectible card trading game. Build your collection, add cards from the catalog, and trade to complete your set." />
+    <meta name="theme-color" content="#0f172a" />
+    <meta property="og:title" content="TradeDex — Gotta Trade 'Em All" />
+    <meta property="og:description" content="Build your collection and trade cards to complete your set. Common, rare, and epic cards await." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>TradeDex — Gotta Trade 'Em All</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "TradeDex",
+        "description": "Build your collection and trade cards to complete your set. A collectible card trading game.",
+        "applicationCategory": "Game",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

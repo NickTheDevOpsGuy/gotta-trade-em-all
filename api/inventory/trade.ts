@@ -12,12 +12,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized. Sign in required.' });
   }
 
+  const supabase = getSupabase();
+
+  // Rate limit: max 50 trades per user per hour
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await supabase
+    .from('trades')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', oneHourAgo);
+  if ((count ?? 0) >= 50) {
+    return res.status(429).json({ error: 'Too many trades. Please try again later.' });
+  }
+
   const { offer_card_ids } = (req.body ?? {}) as { offer_card_ids?: string[] };
   if (!Array.isArray(offer_card_ids) || offer_card_ids.length === 0) {
     return res.status(400).json({ error: 'offer_card_ids array is required' });
   }
-
-  const supabase = getSupabase();
 
   const { data: cardValues } = await supabase
     .from('cards')
@@ -112,6 +123,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: receivedCards } = received.length > 0
     ? await supabase.from('cards').select('id, name, rarity, value').in('id', received)
     : { data: [] };
+
+  await supabase.from('trades').insert({
+    user_id: userId,
+    offered_card_ids: offer_card_ids,
+    received_card_ids: received,
+    offered_value: totalValue,
+  });
 
   return res.json({
     received: receivedCards ?? [],

@@ -3,13 +3,24 @@
 A React-based trading game inspired by collectible monster card mechanics. Build your collection, add cards from the catalog, and trade to complete your set.
 
 [![Build](https://github.com/NickTheDevOpsGuy/gotta-trade-em-all/actions/workflows/build.yml/badge.svg)](https://github.com/NickTheDevOpsGuy/gotta-trade-em-all/actions)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/NickTheDevOpsGuy/gotta-trade-em-all)
+
+> **Try it:** [Live demo](https://gotta-trade-em-all.vercel.app) *(update this URL after deploying)*
+>
+> **Custom domain:** In Vercel → Project Settings → Domains, add your domain (e.g. `tradedex.yourdomain.com`).
+>
+> **Screenshot:** Add a screenshot to the repo (e.g. `docs/screenshot.png`) and link it: `![TradeDex](docs/screenshot.png)`
 
 ## Features
 
-- **Card catalog** — Browse all available cards (common, rare, epic)
+- **Card catalog** — Browse all cards with search, filter by rarity, and sort
 - **Add to collection** — One-click add any card from the catalog to your inventory
-- **Trade cards** — Select cards from your collection and trade for new ones based on value
-- **Quantity tracking** — Duplicate cards are tracked; trade or add more to grow your collection
+- **Trade cards** — Select cards and trade for new ones based on value (rate limited)
+- **Quantity tracking** — Duplicate cards tracked; trade or add more to grow your collection
+- **Export/Import** — Download collection as JSON; import from previous exports
+- **Trade history** — View your recent trades
+- **Themes** — Dark and light mode
+- **PWA** — Install as app; works offline for catalog
 
 ## Tech Stack
 
@@ -23,14 +34,14 @@ A React-based trading game inspired by collectible monster card mechanics. Build
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 18+ (or use `nvm use` with the included `.nvmrc`)
 - npm
 
 ### Installation
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_ORG/gotta-trade-em-all.git
+git clone https://github.com/NickTheDevOpsGuy/gotta-trade-em-all.git
 cd gotta-trade-em-all
 
 # Install dependencies (from project root)
@@ -75,6 +86,13 @@ cd backend && npm start
 
 Serve the frontend `dist/` with any static file server (e.g. `npx serve frontend/dist`).
 
+### Tests
+
+```bash
+npm run test      # Unit tests (Vitest)
+npm run test:e2e  # E2E tests (Playwright; requires dev server)
+```
+
 ## Project Structure
 
 ```
@@ -107,7 +125,10 @@ gotta-trade-em-all/
 
 1. Go to [supabase.com](https://supabase.com) and create a project.
 2. In **Authentication** → **Providers**, enable **Anonymous Sign-In**.
-3. Run the migration: in the Supabase SQL Editor, run the contents of `supabase/migrations/20250216000000_initial.sql`.
+3. Run the migrations in order in the Supabase SQL Editor:
+   - `supabase/migrations/20250216000000_initial.sql`
+   - `supabase/migrations/20250217000000_more_cards.sql`
+   - `supabase/migrations/20250217100000_trade_history.sql`
 4. Copy your project URL and keys from **Settings** → **API**.
 
 ### 2. Deploy to Vercel
@@ -148,7 +169,9 @@ See [docs/API.md](docs/API.md) for full API documentation.
 | GET    | `/api/cards`       | List all cards in catalog  |
 | GET    | `/api/inventory`   | List your collection       |
 | POST   | `/api/inventory`   | Add a card to collection   |
+| POST   | `/api/inventory/import` | Bulk import cards     |
 | POST   | `/api/inventory/trade` | Trade cards for new ones |
+| GET    | `/api/trades`      | Recent trade history       |
 
 ## Documentation
 
