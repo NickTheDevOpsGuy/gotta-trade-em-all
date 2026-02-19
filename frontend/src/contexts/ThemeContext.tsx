@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'dark' | 'light';
+type Theme = 'dark' | 'light' | 'high-contrast';
 
 const ThemeContext = createContext<{
   theme: Theme;
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
+  cycleTheme: () => void;
 } | null>(null);
 
 const STORAGE_KEY = 'tradedex-theme';
@@ -23,9 +24,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (t: Theme) => setThemeState(t);
   const toggleTheme = () => setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  const cycleTheme = () => setThemeState((prev) => (prev === 'dark' ? 'light' : prev === 'light' ? 'high-contrast' : 'dark'));
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, cycleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

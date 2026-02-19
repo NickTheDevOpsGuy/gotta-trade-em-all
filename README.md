@@ -9,7 +9,11 @@ A React-based trading game inspired by collectible monster card mechanics. Build
 >
 > **Custom domain:** In Vercel → Project Settings → Domains, add your domain (e.g. `tradedex.yourdomain.com`).
 >
-> **Screenshot:** Add a screenshot to the repo (e.g. `docs/screenshot.png`) and link it: `![TradeDex](docs/screenshot.png)`
+> **Screenshot:** ![TradeDex](docs/screenshot.png)
+
+**SEO:** `frontend/public/robots.txt` and `sitemap.xml` use the default Vercel URL. Update the Sitemap URL in `robots.txt` and the `<loc>` in `sitemap.xml` if you use a custom domain.
+
+**Dependency updates:** Renovate (`renovate.json`) is configured. Install the [Renovate app](https://github.com/apps/renovate) on the repo.
 
 ## Features
 
@@ -19,7 +23,7 @@ A React-based trading game inspired by collectible monster card mechanics. Build
 - **Quantity tracking** — Duplicate cards tracked; trade or add more to grow your collection
 - **Export/Import** — Download collection as JSON; import from previous exports
 - **Trade history** — View your recent trades
-- **Themes** — Dark and light mode
+- **Themes** — Dark, light, and high-contrast modes
 - **PWA** — Install as app; works offline for catalog
 
 ## Tech Stack
@@ -89,8 +93,9 @@ Serve the frontend `dist/` with any static file server (e.g. `npx serve frontend
 ### Tests
 
 ```bash
-npm run test      # Unit tests (Vitest)
-npm run test:e2e  # E2E tests (Playwright; requires dev server)
+npm run test        # Unit tests (Vitest)
+npm run test:e2e    # E2E tests (Playwright; requires dev server + .env with Supabase vars)
+cd frontend && npm run build && npm run preview   # Then: npm run lighthouse (Lighthouse audit)
 ```
 
 ## Project Structure
@@ -172,6 +177,8 @@ See [docs/API.md](docs/API.md) for full API documentation.
 | POST   | `/api/inventory/import` | Bulk import cards     |
 | POST   | `/api/inventory/trade` | Trade cards for new ones |
 | GET    | `/api/trades`      | Recent trade history       |
+| GET    | `/api/leaderboard` | Top collectors             |
+| GET    | `/api/health`      | Health check               |
 
 ## Documentation
 

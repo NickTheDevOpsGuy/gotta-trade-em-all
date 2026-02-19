@@ -1,7 +1,13 @@
 import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import * as Sentry from '@sentry/react';
 import { Analytics } from '@vercel/analytics/react';
+
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+if (sentryDsn) {
+  Sentry.init({ dsn: sentryDsn, integrations: [Sentry.browserTracingIntegration()], tracesSampleRate: 0.1 });
+}
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';

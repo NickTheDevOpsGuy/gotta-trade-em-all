@@ -58,5 +58,9 @@ describe('catalogUtils', () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Drakono');
     });
+    it('returns empty when no match', () => {
+      const result = searchCards(mockCards, 'xyz');
+      expect(result).toHaveLength(0);
+    });
   });
 });

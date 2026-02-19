@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://gotta-trade-em-all.vercel.app/sitemap.xml

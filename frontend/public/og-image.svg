@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <text x="600" y="280" font-family="system-ui,sans-serif" font-size="72" font-weight="bold" fill="#fbbf24" text-anchor="middle">TradeDex</text>
+  <text x="600" y="350" font-family="system-ui,sans-serif" font-size="32" fill="#94a3b8" text-anchor="middle">Gotta Trade 'Em All</text>
+  <text x="600" y="420" font-family="system-ui,sans-serif" font-size="24" fill="#64748b" text-anchor="middle">Build your collection. Trade cards. Complete your set.</text>
+  <text x="600" y="560" font-family="system-ui,sans-serif" font-size="48" text-anchor="middle"><Ï</text>
+</svg>

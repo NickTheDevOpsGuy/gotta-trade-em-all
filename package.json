@@ -12,7 +12,8 @@
     "build:backend": "npm run build --workspace=backend",
     "test": "npm run test --workspace=frontend",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "prepare": "husky"
   },
   "workspaces": [
     "frontend",
@@ -21,9 +22,17 @@
   ],
   "devDependencies": {
     "@playwright/test": "^1.49.0",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7"
   },
   "engines": {
     "node": ">=18"
+  },
+  "lint-staged": {
+    "frontend/src/**/*.{ts,tsx}": [
+      "cd frontend && npx tsc --noEmit",
+      "cd frontend && npm run test"
+    ]
   }
 }

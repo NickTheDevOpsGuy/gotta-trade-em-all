@@ -2,6 +2,15 @@
 
 Base URL (development): `http://localhost:3001/api`
 
+## Health
+
+### GET /health
+
+Health check for monitoring. Returns DB connection status.
+
+**Response** (200) `{ "status": "ok", "database": "connected" }`  
+**Response** (503) `{ "status": "error", "database": "disconnected" }`
+
 ## Cards
 
 ### GET /cards
@@ -77,6 +86,18 @@ Add a card to your collection.
 
 - `400` — Missing `card_id`
 - `404` — Card not found in catalog
+
+### DELETE /inventory
+
+Remove one card from your collection (for undo).
+
+**Request** (body or query `card_id`)
+
+```json
+{ "card_id": "001" }
+```
+
+**Response** (200) `{ "success": true }`
 
 ### POST /inventory/trade
 
@@ -167,5 +188,26 @@ List your recent trade history (auth required).
       "created_at": "2025-02-17T12:00:00Z"
     }
   ]
+}
+```
+
+---
+
+## Leaderboard
+
+### GET /leaderboard
+
+Top collectors by unique card count. Auth optional; if provided, includes your rank.
+
+**Response**
+
+```json
+{
+  "leaderboard": [
+    { "rank": 1, "uniqueCards": 16, "totalCards": 25 },
+    { "rank": 2, "uniqueCards": 14, "totalCards": 22 }
+  ],
+  "yourRank": 5,
+  "yourUniqueCards": 12
 }
 ```

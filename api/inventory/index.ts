@@ -32,6 +32,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json(rows);
   }
 
+  if (req.method === 'DELETE') {
+    const card_id = (req.body?.card_id ?? req.query?.card_id) as string | undefined;
+    if (!card_id) {
+      return res.status(400).json({ error: 'card_id is required' });
+    }
+
+    const { data: row } = await supabase
+      .from('inventory')
+      .select('quantity')
+      .eq('user_id', userId)
+      .eq('card_id', card_id)
+      .single();
+
+    if (!row || (row.quantity ?? 0) < 1) {
+      return res.status(404).json({ error: 'Card not in inventory' });
+    }
+
+    const newQty = (row.quantity ?? 1) - 1;
+    if (newQty <= 0) {
+      await supabase.from('inventory').delete().eq('user_id', userId).eq('card_id', card_id);
+    } else {
+      await supabase.from('inventory').update({ quantity: newQty }).eq('user_id', userId).eq('card_id', card_id);
+    }
+    return res.json({ success: true });
+  }
+
   if (req.method === 'POST') {
     const { card_id } = req.body ?? {};
     if (!card_id) {
@@ -84,6 +110,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json({ ...(row?.cards ?? {}), quantity: row?.quantity ?? 1 });
   }
 
-  res.setHeader('Allow', 'GET, POST');
+  res.setHeader('Allow', 'GET, POST, DELETE');
   return res.status(405).json({ error: 'Method not allowed' });
 }

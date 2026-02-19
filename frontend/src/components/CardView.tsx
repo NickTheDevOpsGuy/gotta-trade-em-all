@@ -20,9 +20,15 @@ export function CardView({ card, selected, mode = 'display', onAdd, onToggleSele
   const accent = RARITY_COLORS[card.rarity] || '#94a3b8';
   const isSelectable = mode === 'trade' && onToggleSelect;
   const isAddable = mode === 'add' && onAdd;
+  const tooltip = `${card.name} — ${card.rarity} (value: ${card.value})${card.quantity != null && card.quantity > 1 ? ` × ${card.quantity}` : ''}`;
 
   return (
     <motion.div
+      role={isSelectable ? 'button' : undefined}
+      tabIndex={isSelectable ? 0 : undefined}
+      onKeyDown={isSelectable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleSelect?.(card); } } : undefined}
+      title={tooltip}
+      aria-label={isSelectable ? `Select ${card.name} for trade` : undefined}
       layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}

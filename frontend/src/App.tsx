@@ -1,17 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from './types/card';
 import { CardGrid } from './components/CardGrid';
 import { LoadingSkeleton } from './components/LoadingSkeleton';
+import { OfflineBanner } from './components/OfflineBanner';
+import { HelpModal } from './components/HelpModal';
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useToast } from './contexts/ToastContext';
 import { useSound } from './contexts/SoundContext';
 import { filterByRarity, sortCards, searchCards, type SortOption, type RarityFilter } from './lib/catalogUtils';
+import LZString from 'lz-string';
+import { strings } from './lib/i18n';
+import { hapticLight, hapticSuccess } from './lib/haptics';
+import { fetchWithRetry } from './lib/fetchWithRetry';
 
 const API = import.meta.env.VITE_API_URL ?? '/api';
+const APP_VERSION = __APP_VERSION__ ?? '1.0.0';
 
-const themeStyles = {
+const themeStyles: Record<string, { bg: string; text: string; muted: string; accent: string; inputBg: string; inputBorder: string }> = {
   dark: {
     bg: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
     text: '#f8fafc',
@@ -28,6 +35,14 @@ const themeStyles = {
     inputBg: '#fff',
     inputBorder: '#cbd5e1',
   },
+  'high-contrast': {
+    bg: 'linear-gradient(180deg, #000 0%, #111 100%)',
+    text: '#fff',
+    muted: '#ddd',
+    accent: '#ff0',
+    inputBg: '#111',
+    inputBorder: '#fff',
+  },
 };
 
 interface TradeRecord {
@@ -40,7 +55,7 @@ interface TradeRecord {
 
 export default function App() {
   const { token, loading } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, cycleTheme } = useTheme();
   const { addToast } = useToast();
   const { playAdd, playTrade, playClick, enabled: soundEnabled, setEnabled: setSoundEnabled } = useSound();
   const [cards, setCards] = useState<Card[]>([]);
@@ -53,8 +68,19 @@ export default function App() {
   const [catalogFilter, setCatalogFilter] = useState<RarityFilter>('all');
   const [catalogSort, setCatalogSort] = useState<SortOption>('name');
   const [catalogSearch, setCatalogSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [showTradeHistory, setShowTradeHistory] = useState(true);
+  const [leaderboard, setLeaderboard] = useState<{ rank: number; uniqueCards: number; totalCards: number }[]>([]);
+  const [yourRank, setYourRank] = useState<number | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [lastAddedCard, setLastAddedCard] = useState<Card | null>(null);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine);
+  const [showHelp, setShowHelp] = useState(false);
 
-  const styles = themeStyles[theme];
+  const styles = themeStyles[theme] ?? themeStyles.dark;
+  const isDarkLike = theme !== 'light';
   const inputStyle = {
     padding: '8px 12px',
     background: styles.inputBg,
@@ -64,39 +90,116 @@ export default function App() {
     fontSize: 14,
   };
 
+  const check401 = useCallback((r: Response) => {
+    if (r.status === 401) {
+      setSessionExpired(true);
+      throw new Error('Session expired');
+    }
+  }, []);
+
   const fetchData = useCallback(() => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     setFetching(true);
     setError(null);
+    setSessionExpired(false);
     Promise.all([
-      fetch(`${API}/cards`).then((r) => r.json()),
-      fetch(`${API}/inventory`, { headers }).then((r) => r.json()),
-      token ? fetch(`${API}/trades`, { headers }).then((r) => r.json()).then((d) => d.trades ?? []).catch(() => []) : Promise.resolve([]),
+      fetchWithRetry(`${API}/cards`).then((r) => r.json()),
+      fetchWithRetry(`${API}/inventory`, { headers }).then((r) => {
+        check401(r);
+        return r.json();
+      }),
+      token ? fetchWithRetry(`${API}/trades`, { headers }).then((r) => { check401(r); return r.json(); }).then((d) => d.trades ?? []).catch(() => []) : Promise.resolve([]),
+      fetchWithRetry(`${API}/leaderboard`, { headers }).then((r) => r.json()).catch(() => ({ leaderboard: [], yourRank: null })),
     ])
-      .then(([c, inv, tr]) => {
+      .then(([c, inv, tr, lb]) => {
         setCards(c);
         setInventory(inv);
         setTrades(tr);
+        setLeaderboard(lb.leaderboard ?? []);
+        setYourRank(lb.yourRank ?? null);
       })
       .catch((e) => setError(e.message || 'Failed to load data'))
       .finally(() => setFetching(false));
-  }, [token]);
+  }, [token, check401]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData, token]);
 
   useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    const seen = localStorage.getItem('tradedex-onboarding-seen');
+    if (!seen) setShowHelp(true);
+  }, []);
+
+  const closeHelp = useCallback(() => {
+    setShowHelp(false);
+    localStorage.setItem('tradedex-onboarding-seen', '1');
+  }, []);
+
+  const sharedLinkHandled = useRef(false);
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    const fromQuery = new URLSearchParams(window.location.search).get('c');
+    const encoded = hash || fromQuery;
+    if (!encoded || !token || importing || sharedLinkHandled.current) return;
+    sharedLinkHandled.current = true;
+    try {
+      let decoded: Card[];
+      const fromLz = LZString.decompressFromEncodedURIComponent(encoded);
+      if (fromLz) {
+        decoded = JSON.parse(fromLz) as Card[];
+      } else {
+        decoded = JSON.parse(decodeURIComponent(escape(atob(encoded)))) as Card[];
+      }
+      if (Array.isArray(decoded) && decoded.length > 0) {
+        const payload = decoded.map((x) => ({ card_id: x.id, quantity: x.quantity ?? 1 }));
+        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+        setImporting(true);
+        fetch(`${API}/inventory/import`, { method: 'POST', headers, body: JSON.stringify({ items: payload }) })
+          .then((r) => r.ok ? fetchData() : r.json().then((e) => { throw new Error(e.error); }))
+          .then(() => {
+            addToast(`Imported shared collection (${payload.length} cards)`, 'success');
+            window.history.replaceState({}, '', window.location.pathname);
+            window.location.hash = '';
+          })
+          .catch((err) => addToast(err.message, 'error'))
+          .finally(() => setImporting(false));
+      }
+    } catch {
+      sharedLinkHandled.current = false;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '?' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setShowHelp(true);
+      }
       if (e.key === 'Escape') {
-        setTradeSelection(new Set());
-        playClick();
+        if (showHelp) closeHelp();
+        else {
+          setTradeSelection(new Set());
+          playClick();
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [playClick]);
+  }, [playClick, showHelp, closeHelp]);
 
   const handleAddCard = useCallback((card: Card) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -107,11 +210,14 @@ export default function App() {
       body: JSON.stringify({ card_id: card.id }),
     })
       .then((r) => {
+        check401(r);
         if (!r.ok) return r.json().then((e) => { throw new Error(e.error || 'Failed to add'); });
         return r.json();
       })
       .then(() => {
+        hapticSuccess();
         playAdd();
+        setLastAddedCard(card);
         addToast(`Added ${card.name} to collection`, 'success');
         fetchData();
       })
@@ -119,9 +225,33 @@ export default function App() {
         setError(e.message);
         addToast(e.message, 'error');
       });
-  }, [fetchData, token, playAdd, addToast]);
+  }, [fetchData, token, playAdd, addToast, check401]);
+
+  const handleUndoAdd = useCallback(() => {
+    if (!lastAddedCard || !token) return;
+    const cardName = lastAddedCard.name;
+    hapticLight();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+    fetch(`${API}/inventory`, {
+      method: 'DELETE',
+      headers,
+      body: JSON.stringify({ card_id: lastAddedCard.id }),
+    })
+      .then((r) => {
+        check401(r);
+        if (!r.ok) return r.json().then((e) => { throw new Error(e.error); });
+        return r.json();
+      })
+      .then(() => {
+        setLastAddedCard(null);
+        addToast(`Undid add: ${cardName}`, 'info');
+        fetchData();
+      })
+      .catch((e) => addToast(e.message, 'error'));
+  }, [lastAddedCard, token, fetchData, addToast, check401]);
 
   const handleToggleTradeSelect = useCallback((card: Card) => {
+    hapticLight();
     playClick();
     setTradeSelection((prev) => {
       const next = new Set(prev);
@@ -146,12 +276,15 @@ export default function App() {
       body: JSON.stringify({ offer_card_ids: Array.from(tradeSelection) }),
     })
       .then((r) => {
+        check401(r);
         if (r.status === 429) return r.json().then((e) => { throw new Error(e.error || 'Too many trades'); });
         if (!r.ok) return r.json().then((e) => { throw new Error(e.error || 'Trade failed'); });
         return r.json();
       })
       .then((data) => {
+        hapticSuccess();
         playTrade();
+        setLastAddedCard(null);
         const count = data.received?.length ?? 0;
         addToast(`Traded for ${count} new card${count !== 1 ? 's' : ''}!`, 'success');
         setTradeSelection(new Set());
@@ -162,7 +295,7 @@ export default function App() {
         addToast(e.message, 'error');
       })
       .finally(() => setTrading(false));
-  }, [tradeSelection, fetchData, token, playTrade, addToast]);
+  }, [tradeSelection, fetchData, token, playTrade, addToast, check401]);
 
   const catalogFiltered = useMemo(() => {
     const byRarity = filterByRarity(cards, catalogFilter);
@@ -180,7 +313,29 @@ export default function App() {
     return Array.from(tradeSelection).reduce((sum, id) => sum + (cardMap.get(id)?.value ?? 0), 0);
   }, [inventory, tradeSelection]);
 
+  const collectionStats = useMemo(() => {
+    const totalCards = inventory.reduce((s, c) => s + (c.quantity ?? 1), 0);
+    const totalValue = inventory.reduce((s, c) => s + (c.value ?? 0) * (c.quantity ?? 1), 0);
+    let mostOwned: Card | null = null;
+    let maxQty = 0;
+    for (const c of inventory) {
+      const q = c.quantity ?? 1;
+      if (q > maxQty) {
+        maxQty = q;
+        mostOwned = c;
+      }
+    }
+    return { totalCards, totalValue, mostOwned, maxQty };
+  }, [inventory]);
+
+  const achievements = useMemo(() => {
+    const complete = progressPercent === 100;
+    const firstTrade = trades.length > 0;
+    return { complete, firstTrade };
+  }, [progressPercent, trades.length]);
+
   const handleExport = useCallback(() => {
+    setExporting(true);
     const data = { exportedAt: new Date().toISOString(), inventory };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -189,6 +344,17 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(a.href);
     addToast('Collection exported', 'success');
+    setExporting(false);
+  }, [inventory, addToast]);
+
+  const handleShare = useCallback(() => {
+    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(inventory));
+    const url = `${window.location.origin}/share#${compressed}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setShareCopied(true);
+      addToast(strings.actions.copied, 'success');
+      setTimeout(() => setShareCopied(false), 2000);
+    }).catch(() => addToast('Could not copy', 'error'));
   }, [inventory, addToast]);
 
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,18 +370,27 @@ export default function App() {
           addToast('No valid cards in file', 'error');
           return;
         }
+        if (!window.confirm(strings.confirm.importMessage.replace('{count}', String(payload.length)))) {
+          e.target.value = '';
+          return;
+        }
+        setImporting(true);
         const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
         fetch(`${API}/inventory/import`, { method: 'POST', headers, body: JSON.stringify({ items: payload }) })
-          .then((r) => r.ok ? fetchData() : r.json().then((e) => { throw new Error(e.error); }))
+          .then((r) => {
+            check401(r);
+            return r.ok ? fetchData() : r.json().then((e) => { throw new Error(e.error); });
+          })
           .then(() => addToast(`Imported ${payload.length} card(s)`, 'success'))
-          .catch((err) => addToast(err.message, 'error'));
+          .catch((err) => addToast(err.message, 'error'))
+          .finally(() => setImporting(false));
       } catch {
         addToast('Invalid file format', 'error');
       }
+      e.target.value = '';
     };
     reader.readAsText(file);
-    e.target.value = '';
-  }, [token, fetchData, addToast]);
+  }, [token, fetchData, addToast, check401]);
 
   if (loading) {
     return (
@@ -239,25 +414,46 @@ export default function App() {
         padding: 24,
         fontFamily: "'Segoe UI', system-ui, sans-serif",
       }}
+      id="main-content"
+      role="main"
+      aria-label={strings.app.title}
     >
+      {sessionExpired && (
+        <div role="alert" style={{ padding: 16, background: '#7f1d1d', borderRadius: 8, marginBottom: 24, color: '#fecaca', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <span>{strings.app.sessionExpired}</span>
+          <button onClick={() => window.location.reload()} style={{ padding: '8px 16px', background: '#b91c1c', border: 'none', borderRadius: 6, color: '#fecaca', fontWeight: 'bold', cursor: 'pointer' }} aria-label={strings.app.refresh}>
+            {strings.app.refresh}
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 32, marginBottom: 8, color: styles.accent }}>TradeDex</h1>
           <p style={{ color: styles.muted }}>Build your collection and trade to complete your set</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={toggleTheme} style={inputStyle} title="Toggle theme">
-            {theme === 'dark' ? '☀️' : '🌙'}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={cycleTheme} style={inputStyle} aria-label="Cycle theme (dark, light, high contrast)">
+            {theme === 'dark' ? '☀️' : theme === 'light' ? '🌙' : '◐'}
           </button>
-          <button onClick={() => setSoundEnabled(!soundEnabled)} style={inputStyle} title="Toggle sounds">
+          <button onClick={() => setSoundEnabled(!soundEnabled)} style={inputStyle} aria-label={soundEnabled ? 'Mute sounds' : 'Enable sounds'}>
             {soundEnabled ? '🔊' : '🔇'}
+          </button>
+          <button onClick={() => setShowHelp(true)} style={inputStyle} aria-label="Show help (or press ?)">
+            ?
           </button>
           {inventory.length > 0 && (
             <>
-              <button onClick={handleExport} style={inputStyle}>Export</button>
-              <label style={{ ...inputStyle, cursor: 'pointer', display: 'inline-block' }}>
-                Import <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+              <button onClick={handleShare} disabled={shareCopied} style={inputStyle} aria-label="Copy share link">
+                {shareCopied ? strings.actions.copied : strings.actions.share}
+              </button>
+              <button onClick={handleExport} disabled={exporting} style={inputStyle} aria-label="Export collection">{exporting ? strings.actions.exporting : strings.actions.export}</button>
+              <label style={{ ...inputStyle, cursor: importing ? 'wait' : 'pointer', display: 'inline-block', opacity: importing ? 0.7 : 1 }} aria-label="Import collection from file">
+                {importing ? strings.actions.importing : strings.actions.import} <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} disabled={importing} aria-hidden />
               </label>
+              {lastAddedCard && (
+                <button onClick={handleUndoAdd} style={inputStyle} aria-label={`Undo adding ${lastAddedCard.name}`}>{strings.actions.undo}</button>
+              )}
             </>
           )}
         </div>
@@ -269,15 +465,34 @@ export default function App() {
             <span style={{ color: styles.muted, fontSize: 14 }}>Collection progress</span>
             <span style={{ color: styles.accent, fontWeight: 'bold' }}>{progressUnique} / {progressTotal} unique</span>
           </div>
-          <div style={{ height: 8, background: theme === 'dark' ? '#334155' : '#cbd5e1', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ height: 8, background: isDarkLike ? '#334155' : '#cbd5e1', borderRadius: 4, overflow: 'hidden' }}>
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progressPercent}%` }}
               transition={{ duration: 0.3 }}
-              style={{ height: '100%', background: theme === 'dark' ? 'linear-gradient(90deg, #fbbf24, #f59e0b)' : 'linear-gradient(90deg, #f59e0b, #d97706)', borderRadius: 4 }}
+              style={{ height: '100%', background: isDarkLike ? `linear-gradient(90deg, ${styles.accent}, #f59e0b)` : 'linear-gradient(90deg, #f59e0b, #d97706)', borderRadius: 4 }}
             />
           </div>
           {progressPercent === 100 && <p style={{ color: '#86efac', marginTop: 8, fontSize: 14 }}>🎉 Complete set!</p>}
+        </div>
+      )}
+
+      {inventory.length > 0 && (
+        <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+          <span style={{ color: styles.muted, fontSize: 14 }}>Total: {collectionStats.totalCards} cards</span>
+          <span style={{ color: styles.muted, fontSize: 14 }}>Value: {collectionStats.totalValue}</span>
+          {collectionStats.mostOwned && (
+            <span style={{ color: styles.muted, fontSize: 14 }}>
+              Most owned: {collectionStats.mostOwned.name} ×{collectionStats.maxQty}
+            </span>
+          )}
+        </div>
+      )}
+
+      {(achievements.complete || achievements.firstTrade) && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+          {achievements.complete && <span style={{ padding: '4px 10px', background: '#86efac', color: '#0f172a', borderRadius: 8, fontSize: 13 }}>🏆 Complete Set</span>}
+          {achievements.firstTrade && <span style={{ padding: '4px 10px', background: '#60a5fa', color: '#0f172a', borderRadius: 8, fontSize: 13 }}>🤝 First Trade</span>}
         </div>
       )}
 
@@ -300,16 +515,16 @@ export default function App() {
             style={{ ...inputStyle, width: 180 }}
             aria-label="Search catalog"
           />
-          <select value={catalogFilter} onChange={(e) => setCatalogFilter(e.target.value as RarityFilter)} style={inputStyle}>
-            <option value="all">All rarities</option>
-            <option value="common">Common</option>
-            <option value="rare">Rare</option>
-            <option value="epic">Epic</option>
+          <select value={catalogFilter} onChange={(e) => setCatalogFilter(e.target.value as RarityFilter)} style={inputStyle} aria-label="Filter by rarity">
+            <option value="all">{strings.catalog.filterAll}</option>
+            <option value="common">{strings.catalog.filterCommon}</option>
+            <option value="rare">{strings.catalog.filterRare}</option>
+            <option value="epic">{strings.catalog.filterEpic}</option>
           </select>
-          <select value={catalogSort} onChange={(e) => setCatalogSort(e.target.value as SortOption)} style={inputStyle}>
-            <option value="name">Sort by name</option>
-            <option value="value">Sort by value</option>
-            <option value="rarity">Sort by rarity</option>
+          <select value={catalogSort} onChange={(e) => setCatalogSort(e.target.value as SortOption)} style={inputStyle} aria-label="Sort catalog">
+            <option value="name">{strings.catalog.sortName}</option>
+            <option value="value">{strings.catalog.sortValue}</option>
+            <option value="rarity">{strings.catalog.sortRarity}</option>
           </select>
         </div>
         {fetching ? <LoadingSkeleton /> : <CardGrid cards={catalogFiltered} mode="add" onAdd={handleAddCard} />}
@@ -320,7 +535,7 @@ export default function App() {
         {fetching && inventory.length === 0 ? (
           <LoadingSkeleton />
         ) : inventory.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center', background: theme === 'dark' ? 'rgba(30, 41, 59, 0.5)' : 'rgba(241, 245, 249, 0.8)', borderRadius: 12, border: `2px dashed ${styles.inputBorder}` }}>
+          <div style={{ padding: 48, textAlign: 'center', background: isDarkLike ? 'rgba(30, 41, 59, 0.5)' : 'rgba(241, 245, 249, 0.8)', borderRadius: 12, border: `2px dashed ${styles.inputBorder}` }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
             <p style={{ color: styles.muted, fontSize: 18, marginBottom: 8 }}>Your collection is empty</p>
             <p style={{ color: styles.muted }}>Add your first card from the catalog above to get started!</p>
@@ -334,7 +549,7 @@ export default function App() {
             <CardGrid cards={inventory} selected={tradeSelection} mode="trade" onToggleSelect={handleToggleTradeSelect} />
             {tradeSelection.size > 0 && (
               <div style={{ marginTop: 24 }}>
-                <button onClick={handleTrade} disabled={trading} style={{ padding: '12px 24px', background: styles.accent, border: 'none', borderRadius: 8, color: theme === 'dark' ? '#0f172a' : '#fff', fontWeight: 'bold', fontSize: 16, cursor: trading ? 'not-allowed' : 'pointer' }}>
+                <button onClick={handleTrade} disabled={trading} style={{ padding: '12px 24px', background: styles.accent, border: 'none', borderRadius: 8, color: '#0f172a', fontWeight: 'bold', fontSize: 16, cursor: trading ? 'not-allowed' : 'pointer' }} aria-label={trading ? 'Trading in progress' : `Trade ${tradeSelection.size} selected cards`}>
                   {trading ? 'Trading...' : `Trade ${tradeSelection.size} card(s)`}
                 </button>
                 <button onClick={() => setTradeSelection(new Set())} style={{ marginLeft: 12, padding: '12px 24px', background: 'transparent', border: `1px solid ${styles.inputBorder}`, borderRadius: 8, color: styles.muted, cursor: 'pointer' }}>
@@ -346,12 +561,15 @@ export default function App() {
         )}
       </section>
 
-      {trades.length > 0 && (
+      {trades.length > 0 && showTradeHistory && (
         <section style={{ marginBottom: 40 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 8, color: styles.text }}>Recent Trades</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h2 style={{ fontSize: 20, color: styles.text }}>Recent Trades</h2>
+            <button onClick={() => setShowTradeHistory(false)} style={{ ...inputStyle, padding: '4px 12px', fontSize: 12 }}>Dismiss</button>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {trades.slice(0, 5).map((t) => (
-              <div key={t.id} style={{ padding: 12, background: theme === 'dark' ? '#1e293b' : '#f1f5f9', borderRadius: 8, fontSize: 14 }}>
+              <div key={t.id} style={{ padding: 12, background: isDarkLike ? '#1e293b' : '#f1f5f9', borderRadius: 8, fontSize: 14 }}>
                 <span style={{ color: styles.muted }}>Traded {t.offered_value} value for {t.received_card_ids.length} card(s)</span>
                 <span style={{ color: styles.muted, marginLeft: 8 }}>— {new Date(t.created_at).toLocaleDateString()}</span>
               </div>
@@ -359,6 +577,28 @@ export default function App() {
           </div>
         </section>
       )}
+
+      {leaderboard.length > 0 && (
+        <section style={{ marginBottom: 40 }} aria-labelledby="leaderboard-heading">
+          <h2 id="leaderboard-heading" style={{ fontSize: 20, marginBottom: 8, color: styles.text }}>{strings.leaderboard.title}</h2>
+          <p style={{ color: styles.muted, fontSize: 14, marginBottom: 12 }}>Top collectors by unique cards</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {leaderboard.slice(0, 10).map((entry) => (
+              <div key={entry.rank} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: isDarkLike ? '#1e293b' : '#f1f5f9', borderRadius: 8 }}>
+                <span>#{entry.rank} — {entry.uniqueCards} unique, {entry.totalCards} total</span>
+                {yourRank === entry.rank && <span style={{ color: styles.accent }}>You</span>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <footer style={{ marginTop: 48, paddingTop: 24, borderTop: `1px solid ${styles.inputBorder}`, color: styles.muted, fontSize: 12, textAlign: 'center' }} role="contentinfo">
+        TradeDex v{APP_VERSION}
+      </footer>
+
+      {!isOnline && <OfflineBanner />}
+      {showHelp && <HelpModal onClose={closeHelp} isDark={isDarkLike} />}
     </motion.div>
   );
 }
