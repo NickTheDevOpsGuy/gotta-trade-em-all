@@ -62,7 +62,8 @@ export const strings = {
   },
   confirm: {
     importTitle: 'Import collection?',
-    importMessage: 'This will add {count} card(s) to your collection. Continue?',
+    importMessage:
+      'This will add {count} card(s) to your collection. Continue?',
   },
 } as const;
 

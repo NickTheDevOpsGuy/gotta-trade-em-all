@@ -23,8 +23,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   const setTheme = (t: Theme) => setThemeState(t);
-  const toggleTheme = () => setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  const cycleTheme = () => setThemeState((prev) => (prev === 'dark' ? 'light' : prev === 'light' ? 'high-contrast' : 'dark'));
+  const toggleTheme = () =>
+    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  const cycleTheme = () =>
+    setThemeState((prev) =>
+      prev === 'dark' ? 'light' : prev === 'light' ? 'high-contrast' : 'dark'
+    );
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, cycleTheme }}>

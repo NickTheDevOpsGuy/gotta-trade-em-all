@@ -1,13 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <script>(function(){var t=localStorage.getItem('tradedex-theme');document.documentElement.dataset.theme=['dark','light','high-contrast'].includes(t)?t:'dark';})();</script>
+    <script>
+      (function () {
+        var t = localStorage.getItem('tradedex-theme');
+        document.documentElement.dataset.theme = [
+          'dark',
+          'light',
+          'high-contrast',
+        ].includes(t)
+          ? t
+          : 'dark';
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="TradeDex — A collectible card trading game. Build your collection, add cards from the catalog, and trade to complete your set." />
+    <meta
+      name="description"
+      content="TradeDex — A collectible card trading game. Build your collection, add cards from the catalog, and trade to complete your set."
+    />
     <meta name="theme-color" content="#0f172a" />
     <meta property="og:title" content="TradeDex — Gotta Trade 'Em All" />
-    <meta property="og:description" content="Build your collection and trade cards to complete your set. Common, rare, and epic cards await." />
+    <meta
+      property="og:description"
+      content="Build your collection and trade cards to complete your set. Common, rare, and epic cards await."
+    />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />

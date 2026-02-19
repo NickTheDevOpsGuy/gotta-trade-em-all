@@ -13,7 +13,8 @@ export function sortCards(cards: Card[], sort: SortOption): Card[] {
   const order: Record<string, number> = { common: 1, rare: 2, epic: 3 };
   if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
   else if (sort === 'value') list.sort((a, b) => b.value - a.value);
-  else if (sort === 'rarity') list.sort((a, b) => (order[a.rarity] ?? 0) - (order[b.rarity] ?? 0));
+  else if (sort === 'rarity')
+    list.sort((a, b) => (order[a.rarity] ?? 0) - (order[b.rarity] ?? 0));
   return list;
 }
 

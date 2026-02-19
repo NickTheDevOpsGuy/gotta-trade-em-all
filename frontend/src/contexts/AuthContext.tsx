@@ -25,14 +25,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
     return () => subscription.unsubscribe();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, loading, token: session?.access_token ?? null }}>
+    <AuthContext.Provider
+      value={{ session, loading, token: session?.access_token ?? null }}
+    >
       {children}
     </AuthContext.Provider>
   );

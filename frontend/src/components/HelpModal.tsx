@@ -48,7 +48,9 @@ export function HelpModal({ onClose, isDark }: HelpModalProps) {
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
         }}
       >
-        <h2 id="help-title" style={{ marginBottom: 16 }}>How to play</h2>
+        <h2 id="help-title" style={{ marginBottom: 16 }}>
+          How to play
+        </h2>
         <ol style={{ paddingLeft: 20, lineHeight: 1.8 }}>
           {helpContent.map((line, i) => (
             <li key={i}>{line}</li>

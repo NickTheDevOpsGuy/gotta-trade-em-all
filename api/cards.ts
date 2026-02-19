@@ -8,7 +8,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const supabase = getSupabase();
-  const { data, error } = await supabase.from('cards').select('id, name, rarity, value');
+  const { data, error } = await supabase
+    .from('cards')
+    .select('id, name, rarity, value');
 
   if (error) {
     console.error('Cards fetch error:', error);

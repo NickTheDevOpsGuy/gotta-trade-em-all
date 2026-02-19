@@ -1,7 +1,5 @@
-
 import express from 'express';
 import cors from 'cors';
-import { db } from './db';
 import cards from './routes/cards';
 import inventory from './routes/inventory';
 

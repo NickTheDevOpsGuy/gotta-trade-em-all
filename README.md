@@ -90,6 +90,15 @@ cd backend && npm start
 
 Serve the frontend `dist/` with any static file server (e.g. `npx serve frontend/dist`).
 
+### Lint & Format
+
+```bash
+npm run lint        # Lint all workspaces
+npm run lint:fix    # Auto-fix lint issues
+npm run format      # Format code with Prettier
+npm run format:check # Verify formatting (CI)
+```
+
 ### Tests
 
 ```bash

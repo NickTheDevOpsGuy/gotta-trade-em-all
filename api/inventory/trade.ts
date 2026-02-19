@@ -22,7 +22,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('user_id', userId)
     .gte('created_at', oneHourAgo);
   if ((count ?? 0) >= 50) {
-    return res.status(429).json({ error: 'Too many trades. Please try again later.' });
+    return res
+      .status(429)
+      .json({ error: 'Too many trades. Please try again later.' });
   }
 
   const { offer_card_ids } = (req.body ?? {}) as { offer_card_ids?: string[] };
@@ -35,7 +37,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .select('id, value')
     .in('id', offer_card_ids);
 
-  const totalValue = (cardValues ?? []).reduce((sum, c) => sum + (c.value ?? 0), 0);
+  const totalValue = (cardValues ?? []).reduce(
+    (sum, c) => sum + (c.value ?? 0),
+    0
+  );
   if (totalValue === 0) {
     return res.status(400).json({ error: 'Invalid card IDs' });
   }
@@ -49,7 +54,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single();
 
     if (!row || (row.quantity ?? 0) < 1) {
-      return res.status(400).json({ error: `Insufficient quantity for card ${cardId}` });
+      return res
+        .status(400)
+        .json({ error: `Insufficient quantity for card ${cardId}` });
     }
   }
 
@@ -63,9 +70,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const newQty = (row?.quantity ?? 1) - 1;
     if (newQty <= 0) {
-      await supabase.from('inventory').delete().eq('user_id', userId).eq('card_id', cardId);
+      await supabase
+        .from('inventory')
+        .delete()
+        .eq('user_id', userId)
+        .eq('card_id', cardId);
     } else {
-      await supabase.from('inventory').update({ quantity: newQty }).eq('user_id', userId).eq('card_id', cardId);
+      await supabase
+        .from('inventory')
+        .update({ quantity: newQty })
+        .eq('user_id', userId)
+        .eq('card_id', cardId);
     }
   }
 
@@ -96,9 +111,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .single();
 
       if (inv) {
-        await supabase.from('inventory').update({ quantity: (inv.quantity ?? 0) + 1 }).eq('user_id', userId).eq('card_id', card.id);
+        await supabase
+          .from('inventory')
+          .update({ quantity: (inv.quantity ?? 0) + 1 })
+          .eq('user_id', userId)
+          .eq('card_id', card.id);
       } else {
-        await supabase.from('inventory').insert({ user_id: userId, card_id: card.id, quantity: 1 });
+        await supabase
+          .from('inventory')
+          .insert({ user_id: userId, card_id: card.id, quantity: 1 });
       }
     }
   }
@@ -113,16 +134,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .single();
 
     if (inv) {
-      await supabase.from('inventory').update({ quantity: (inv.quantity ?? 0) + 1 }).eq('user_id', userId).eq('card_id', give.id);
+      await supabase
+        .from('inventory')
+        .update({ quantity: (inv.quantity ?? 0) + 1 })
+        .eq('user_id', userId)
+        .eq('card_id', give.id);
     } else {
-      await supabase.from('inventory').insert({ user_id: userId, card_id: give.id, quantity: 1 });
+      await supabase
+        .from('inventory')
+        .insert({ user_id: userId, card_id: give.id, quantity: 1 });
     }
     received.push(give.id);
   }
 
-  const { data: receivedCards } = received.length > 0
-    ? await supabase.from('cards').select('id, name, rarity, value').in('id', received)
-    : { data: [] };
+  const { data: receivedCards } =
+    received.length > 0
+      ? await supabase
+          .from('cards')
+          .select('id, name, rarity, value')
+          .in('id', received)
+      : { data: [] };
 
   await supabase.from('trades').insert({
     user_id: userId,

@@ -29,7 +29,12 @@ describe('catalogUtils', () => {
   describe('sortCards', () => {
     it('sorts by name', () => {
       const result = sortCards(mockCards, 'name');
-      expect(result.map((c) => c.name)).toEqual(['Drakono', 'Flametail', 'Leafling', 'Stonehog']);
+      expect(result.map((c) => c.name)).toEqual([
+        'Drakono',
+        'Flametail',
+        'Leafling',
+        'Stonehog',
+      ]);
     });
     it('sorts by value descending', () => {
       const result = sortCards(mockCards, 'value');

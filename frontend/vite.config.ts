@@ -21,7 +21,8 @@ export default defineConfig({
       manifest: { theme_color: '#0f172a', name: 'TradeDex' },
       workbox: { globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'] },
     }),
-    process.env.ANALYZE && visualizer({ open: true, gzipSize: true, filename: 'dist/stats.html' }),
+    process.env.ANALYZE &&
+      visualizer({ open: true, gzipSize: true, filename: 'dist/stats.html' }),
   ].filter(Boolean),
   test: {
     globals: true,

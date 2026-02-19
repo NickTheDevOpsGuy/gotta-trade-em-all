@@ -16,7 +16,13 @@ interface CardViewProps {
   onToggleSelect?: (card: Card) => void;
 }
 
-export function CardView({ card, selected, mode = 'display', onAdd, onToggleSelect }: CardViewProps) {
+export function CardView({
+  card,
+  selected,
+  mode = 'display',
+  onAdd,
+  onToggleSelect,
+}: CardViewProps) {
   const accent = RARITY_COLORS[card.rarity] || '#94a3b8';
   const isSelectable = mode === 'trade' && onToggleSelect;
   const isAddable = mode === 'add' && onAdd;
@@ -26,7 +32,16 @@ export function CardView({ card, selected, mode = 'display', onAdd, onToggleSele
     <motion.div
       role={isSelectable ? 'button' : undefined}
       tabIndex={isSelectable ? 0 : undefined}
-      onKeyDown={isSelectable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleSelect?.(card); } } : undefined}
+      onKeyDown={
+        isSelectable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onToggleSelect?.(card);
+              }
+            }
+          : undefined
+      }
       title={tooltip}
       aria-label={isSelectable ? `Select ${card.name} for trade` : undefined}
       layout
@@ -41,7 +56,9 @@ export function CardView({ card, selected, mode = 'display', onAdd, onToggleSele
         padding: 16,
         background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
         color: '#f8fafc',
-        boxShadow: selected ? `0 0 16px ${accent}40` : '0 4px 6px rgba(0,0,0,0.3)',
+        boxShadow: selected
+          ? `0 0 16px ${accent}40`
+          : '0 4px 6px rgba(0,0,0,0.3)',
         cursor: isSelectable ? 'pointer' : 'default',
         transition: 'all 0.2s ease',
         position: 'relative',
@@ -50,7 +67,14 @@ export function CardView({ card, selected, mode = 'display', onAdd, onToggleSele
       <div style={{ fontSize: 28, marginBottom: 8, lineHeight: 1 }}>
         {getCardIcon(card.id, card.rarity)}
       </div>
-      <div style={{ fontSize: 10, color: accent, textTransform: 'uppercase', marginBottom: 4 }}>
+      <div
+        style={{
+          fontSize: 10,
+          color: accent,
+          textTransform: 'uppercase',
+          marginBottom: 4,
+        }}
+      >
         {card.rarity}
       </div>
       <strong style={{ fontSize: 16, display: 'block' }}>{card.name}</strong>
@@ -58,13 +82,28 @@ export function CardView({ card, selected, mode = 'display', onAdd, onToggleSele
         Value: {card.value}
       </div>
       {card.quantity != null && card.quantity > 1 && (
-        <div style={{ position: 'absolute', top: 8, right: 8, background: accent, color: '#0f172a', borderRadius: 8, padding: '2px 8px', fontSize: 12, fontWeight: 'bold' }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            background: accent,
+            color: '#0f172a',
+            borderRadius: 8,
+            padding: '2px 8px',
+            fontSize: 12,
+            fontWeight: 'bold',
+          }}
+        >
           ×{card.quantity}
         </div>
       )}
       {isAddable && (
         <button
-          onClick={(e) => { e.stopPropagation(); onAdd(card); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd(card);
+          }}
           style={{
             marginTop: 12,
             padding: '8px 16px',

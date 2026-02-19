@@ -10,7 +10,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabase = getSupabase();
   const userId = await getUserIdFromAuth(req.headers.authorization ?? null);
 
-  const { data: allInventory } = await supabase.from('inventory').select('user_id, card_id, quantity');
+  const { data: allInventory } = await supabase
+    .from('inventory')
+    .select('user_id, card_id, quantity');
 
   const byUser = new Map<string, { unique: Set<string>; total: number }>();
   for (const row of allInventory ?? []) {
@@ -37,7 +39,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const you = byUser.get(userId);
     if (you) {
       yourUniqueCards = you.unique.size;
-      yourRank = 1 + Array.from(byUser.values()).filter((v) => v.unique.size > you.unique.size).length;
+      yourRank =
+        1 +
+        Array.from(byUser.values()).filter(
+          (v) => v.unique.size > you.unique.size
+        ).length;
     }
   }
 

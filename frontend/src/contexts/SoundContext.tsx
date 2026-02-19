@@ -1,4 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 
 const SoundContext = createContext<{
   enabled: boolean;
@@ -14,7 +20,11 @@ function useBeep() {
   return useCallback((freq: number, duration: number) => {
     if (typeof window === 'undefined') return;
     try {
-      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const ctx = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext
+      )();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -59,7 +69,9 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
   }, [enabled, beep]);
 
   return (
-    <SoundContext.Provider value={{ enabled, setEnabled, playAdd, playTrade, playClick }}>
+    <SoundContext.Provider
+      value={{ enabled, setEnabled, playAdd, playTrade, playClick }}
+    >
       {children}
     </SoundContext.Provider>
   );

@@ -12,11 +12,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('inventory')
-      .select(`
+      .select(
+        `
         card_id,
         quantity,
         cards (id, name, rarity, value)
-      `)
+      `
+      )
       .eq('user_id', userId)
       .gt('quantity', 0);
 
@@ -25,15 +27,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Failed to fetch inventory' });
     }
 
-    const rows = (data ?? []).map((row: { cards: Record<string, unknown>; card_id: string; quantity: number }) => ({
-      ...(row.cards as Record<string, unknown>),
-      quantity: row.quantity,
-    }));
+    const rows = (data ?? []).map(
+      (row: {
+        cards: Record<string, unknown>;
+        card_id: string;
+        quantity: number;
+      }) => ({
+        ...(row.cards as Record<string, unknown>),
+        quantity: row.quantity,
+      })
+    );
     return res.json(rows);
   }
 
   if (req.method === 'DELETE') {
-    const card_id = (req.body?.card_id ?? req.query?.card_id) as string | undefined;
+    const card_id = (req.body?.card_id ?? req.query?.card_id) as
+      | string
+      | undefined;
     if (!card_id) {
       return res.status(400).json({ error: 'card_id is required' });
     }
@@ -51,9 +61,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const newQty = (row.quantity ?? 1) - 1;
     if (newQty <= 0) {
-      await supabase.from('inventory').delete().eq('user_id', userId).eq('card_id', card_id);
+      await supabase
+        .from('inventory')
+        .delete()
+        .eq('user_id', userId)
+        .eq('card_id', card_id);
     } else {
-      await supabase.from('inventory').update({ quantity: newQty }).eq('user_id', userId).eq('card_id', card_id);
+      await supabase
+        .from('inventory')
+        .update({ quantity: newQty })
+        .eq('user_id', userId)
+        .eq('card_id', card_id);
     }
     return res.json({ success: true });
   }
@@ -64,7 +82,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'card_id is required' });
     }
 
-    const { data: card } = await supabase.from('cards').select('id').eq('id', card_id).single();
+    const { data: card } = await supabase
+      .from('cards')
+      .select('id')
+      .eq('id', card_id)
+      .single();
     if (!card) {
       return res.status(404).json({ error: 'Card not found' });
     }
@@ -98,10 +120,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: updated } = await supabase
       .from('inventory')
-      .select(`
+      .select(
+        `
         quantity,
         cards (id, name, rarity, value)
-      `)
+      `
+      )
       .eq('user_id', userId)
       .eq('card_id', card_id)
       .single();

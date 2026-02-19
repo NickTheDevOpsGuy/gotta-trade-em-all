@@ -16,7 +16,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data, error } = await getSupabase()
     .from('trades')
-    .select('id, offered_card_ids, received_card_ids, offered_value, created_at')
+    .select(
+      'id, offered_card_ids, received_card_ids, offered_value, created_at'
+    )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(limit);

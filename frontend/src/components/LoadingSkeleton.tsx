@@ -1,6 +1,12 @@
 export function LoadingSkeleton() {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+        gap: 16,
+      }}
+    >
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
@@ -15,7 +21,8 @@ export function LoadingSkeleton() {
             style={{
               height: 24,
               width: '60%',
-              background: 'linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%)',
+              background:
+                'linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%)',
               backgroundSize: '200% 100%',
               animation: 'shimmer 1.5s infinite',
               borderRadius: 4,

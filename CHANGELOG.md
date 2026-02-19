@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.4] - 2025-02-17
+
+### Added
+- CI: lint and format:check in build workflow
+- .vscode/settings.json (format on save, ESLint)
+- .vscode/extensions.json (recommended ESLint + Prettier)
+- ESLint + Prettier for backend and api workspaces
+- Root scripts: lint, lint:fix, format, format:check run across all workspaces
+- README Lint & Format section
+
+### Changed
+- Removed unused `db` import from backend/src/index.ts
+
+## [1.4.3] - 2025-02-17
+
+### Changed
+- npm overrides: reduced high-severity vulns to 0 (minimatch, tar, path-to-regexp, undici, esbuild). ajv omitted (breaks ESLint); 12 moderate remain
+- Removed eslint-plugin-react-refresh (required ESLint 9, conflicted with ESLint 8)
+
+## [1.4.2] - 2025-02-17
+
+### Changed
+- Added npm `overrides` to fix transitive vulnerabilities (minimatch, tar, path-to-regexp, undici, esbuild) without breaking changes
+
 ## [1.4.1] - 2025-02-17
 
 ### Added

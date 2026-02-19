@@ -7,11 +7,16 @@ export function getSupabase(): SupabaseClient {
   return createClient(url, serviceKey);
 }
 
-export async function getUserIdFromAuth(authHeader: string | null): Promise<string | null> {
+export async function getUserIdFromAuth(
+  authHeader: string | null
+): Promise<string | null> {
   if (!authHeader?.startsWith('Bearer ')) return null;
   const token = authHeader.slice(7);
   const supabase = getSupabase();
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
   if (error || !user) return null;
   return user.id;
 }

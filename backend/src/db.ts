@@ -1,4 +1,3 @@
-
 import Database from 'better-sqlite3';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';

@@ -22,17 +22,27 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Light theme */
-[data-theme="light"] {
+[data-theme='light'] {
   --bg-primary: #f8fafc;
   --bg-secondary: #f1f5f9;
   --text-primary: #0f172a;
@@ -41,7 +51,7 @@
   --border: #e2e8f0;
 }
 
-[data-theme="dark"] {
+[data-theme='dark'] {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
   --text-primary: #f8fafc;
@@ -50,7 +60,7 @@
   --border: #334155;
 }
 
-[data-theme="high-contrast"] {
+[data-theme='high-contrast'] {
   --bg-primary: #000;
   --bg-secondary: #111;
   --text-primary: #fff;
@@ -60,7 +70,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

@@ -1,16 +1,19 @@
-
 import { Router } from 'express';
 import { db } from '../db';
 
 const router = Router();
 
 router.get('/', (_req, res) => {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT c.id, c.name, c.rarity, c.value, i.quantity
     FROM inventory i
     JOIN cards c ON c.id = i.card_id
     WHERE i.quantity > 0
-  `).all();
+  `
+    )
+    .all();
   res.json(rows);
 });
 
@@ -25,20 +28,30 @@ router.post('/', (req, res) => {
     return res.status(404).json({ error: 'Card not found' });
   }
 
-  const existing = db.prepare('SELECT id, quantity FROM inventory WHERE card_id = ?').get(card_id) as { id: number; quantity: number } | undefined;
+  const existing = db
+    .prepare('SELECT id, quantity FROM inventory WHERE card_id = ?')
+    .get(card_id) as { id: number; quantity: number } | undefined;
 
   if (existing) {
-    db.prepare('UPDATE inventory SET quantity = quantity + 1 WHERE card_id = ?').run(card_id);
+    db.prepare(
+      'UPDATE inventory SET quantity = quantity + 1 WHERE card_id = ?'
+    ).run(card_id);
   } else {
-    db.prepare('INSERT INTO inventory (card_id, quantity) VALUES (?, 1)').run(card_id);
+    db.prepare('INSERT INTO inventory (card_id, quantity) VALUES (?, 1)').run(
+      card_id
+    );
   }
 
-  const updated = db.prepare(`
+  const updated = db
+    .prepare(
+      `
     SELECT c.id, c.name, c.rarity, c.value, i.quantity
     FROM inventory i
     JOIN cards c ON c.id = i.card_id
     WHERE i.card_id = ?
-  `).get(card_id);
+  `
+    )
+    .get(card_id);
 
   res.json(updated);
 });
@@ -49,11 +62,15 @@ router.post('/trade', (req, res) => {
     return res.status(400).json({ error: 'offer_card_ids array is required' });
   }
 
-  const offerValue = db.prepare(`
+  const offerValue = db
+    .prepare(
+      `
     SELECT COALESCE(SUM(c.value), 0) as total
     FROM cards c
     WHERE c.id IN (${offer_card_ids.map(() => '?').join(',')})
-  `).get(...offer_card_ids) as { total: number };
+  `
+    )
+    .get(...offer_card_ids) as { total: number };
 
   if (offerValue.total === 0) {
     return res.status(400).json({ error: 'Invalid card IDs' });
@@ -61,22 +78,33 @@ router.post('/trade', (req, res) => {
 
   // Decrement inventory for offered cards
   for (const cardId of offer_card_ids) {
-    const row = db.prepare('SELECT quantity FROM inventory WHERE card_id = ?').get(cardId) as { quantity: number } | undefined;
+    const row = db
+      .prepare('SELECT quantity FROM inventory WHERE card_id = ?')
+      .get(cardId) as { quantity: number } | undefined;
     if (!row || row.quantity < 1) {
-      return res.status(400).json({ error: `Insufficient quantity for card ${cardId}` });
+      return res
+        .status(400)
+        .json({ error: `Insufficient quantity for card ${cardId}` });
     }
-    db.prepare('UPDATE inventory SET quantity = quantity - 1 WHERE card_id = ?').run(cardId);
+    db.prepare(
+      'UPDATE inventory SET quantity = quantity - 1 WHERE card_id = ?'
+    ).run(cardId);
   }
   db.prepare('DELETE FROM inventory WHERE quantity <= 0').run();
 
   // Get available cards to receive (exclude offered to encourage variety; fallback to all if empty)
   const uniqueOffered = [...new Set(offer_card_ids)];
-  let pool = uniqueOffered.length > 0
-    ? db.prepare(`
+  let pool =
+    uniqueOffered.length > 0
+      ? (db
+          .prepare(
+            `
         SELECT id FROM cards
         WHERE id NOT IN (${uniqueOffered.map(() => '?').join(',')})
-      `).all(...uniqueOffered) as { id: string }[]
-    : [];
+      `
+          )
+          .all(...uniqueOffered) as { id: string }[])
+      : [];
   if (pool.length === 0) {
     pool = db.prepare('SELECT id FROM cards').all() as { id: string }[];
   }
@@ -88,16 +116,24 @@ router.post('/trade', (req, res) => {
 
   for (const { id } of pool) {
     if (remainingValue <= 0) break;
-    const card = db.prepare('SELECT value FROM cards WHERE id = ?').get(id) as { value: number };
+    const card = db.prepare('SELECT value FROM cards WHERE id = ?').get(id) as {
+      value: number;
+    };
     if (card && card.value <= remainingValue) {
       received.push(id);
       remainingValue -= card.value;
 
-      const inv = db.prepare('SELECT quantity FROM inventory WHERE card_id = ?').get(id) as { quantity: number } | undefined;
+      const inv = db
+        .prepare('SELECT quantity FROM inventory WHERE card_id = ?')
+        .get(id) as { quantity: number } | undefined;
       if (inv) {
-        db.prepare('UPDATE inventory SET quantity = quantity + 1 WHERE card_id = ?').run(id);
+        db.prepare(
+          'UPDATE inventory SET quantity = quantity + 1 WHERE card_id = ?'
+        ).run(id);
       } else {
-        db.prepare('INSERT INTO inventory (card_id, quantity) VALUES (?, 1)').run(id);
+        db.prepare(
+          'INSERT INTO inventory (card_id, quantity) VALUES (?, 1)'
+        ).run(id);
       }
     }
   }
@@ -105,22 +141,33 @@ router.post('/trade', (req, res) => {
   // If we didn't give enough, give at least one random card
   if (received.length === 0 && pool.length > 0) {
     const giveId = pool[Math.floor(Math.random() * pool.length)].id;
-    const inv = db.prepare('SELECT quantity FROM inventory WHERE card_id = ?').get(giveId) as { quantity: number } | undefined;
+    const inv = db
+      .prepare('SELECT quantity FROM inventory WHERE card_id = ?')
+      .get(giveId) as { quantity: number } | undefined;
     if (inv) {
-      db.prepare('UPDATE inventory SET quantity = quantity + 1 WHERE card_id = ?').run(giveId);
+      db.prepare(
+        'UPDATE inventory SET quantity = quantity + 1 WHERE card_id = ?'
+      ).run(giveId);
     } else {
-      db.prepare('INSERT INTO inventory (card_id, quantity) VALUES (?, 1)').run(giveId);
+      db.prepare('INSERT INTO inventory (card_id, quantity) VALUES (?, 1)').run(
+        giveId
+      );
     }
     received.push(giveId);
   }
 
-  const receivedCards = received.length > 0
-    ? db.prepare(`
+  const receivedCards =
+    received.length > 0
+      ? db
+          .prepare(
+            `
         SELECT c.id, c.name, c.rarity, c.value
         FROM cards c
         WHERE c.id IN (${received.map(() => '?').join(',')})
-      `).all(...received)
-    : [];
+      `
+          )
+          .all(...received)
+      : [];
 
   res.json({
     received: receivedCards,

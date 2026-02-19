@@ -1,7 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getSupabase } from './lib/supabase';
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(
+  _req: VercelRequest,
+  res: VercelResponse
+) {
   try {
     const supabase = getSupabase();
     const { error } = await supabase.from('cards').select('id').limit(1);

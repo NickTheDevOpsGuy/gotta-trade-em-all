@@ -1,4 +1,3 @@
-
 export type Rarity = 'common' | 'rare' | 'epic';
 
 export interface Card {
