@@ -40,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Failed to fetch inventory' });
     }
 
-    const rows = (data as InventoryRow[] | null ?? [])
+    const rows = ((data as InventoryRow[] | null) ?? [])
       .map((row) => {
         const card = row.cards?.[0];
         if (!card) return null;
@@ -52,7 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'DELETE') {
-    const card_id = (req.body?.card_id ?? req.query?.card_id) as string | undefined;
+    const card_id = (req.body?.card_id ?? req.query?.card_id) as
+      | string
+      | undefined;
     if (!card_id) {
       return res.status(400).json({ error: 'card_id is required' });
     }
@@ -70,7 +72,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const newQty = (row.quantity ?? 1) - 1;
     if (newQty <= 0) {
-      await supabase.from('inventory').delete().eq('user_id', userId).eq('card_id', card_id);
+      await supabase
+        .from('inventory')
+        .delete()
+        .eq('user_id', userId)
+        .eq('card_id', card_id);
     } else {
       await supabase
         .from('inventory')
@@ -88,7 +94,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'card_id is required' });
     }
 
-    const { data: card } = await supabase.from('cards').select('id').eq('id', card_id).single();
+    const { data: card } = await supabase
+      .from('cards')
+      .select('id')
+      .eq('id', card_id)
+      .single();
     if (!card) {
       return res.status(404).json({ error: 'Card not found' });
     }
@@ -134,7 +144,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('card_id', card_id)
       .single();
 
-    const typed = (updated as { quantity: number; cards: Card[] | null } | null) ?? null;
+    const typed =
+      (updated as { quantity: number; cards: Card[] | null } | null) ?? null;
     const updatedCard = typed?.cards?.[0];
 
     return res.json({
