@@ -1,6 +1,19 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getSupabase, getUserIdFromAuth } from '../lib/supabase';
 
+type Card = {
+  id: string;
+  name: string;
+  rarity: string;
+  value: number;
+};
+
+type InventoryRow = {
+  card_id: string;
+  quantity: number;
+  cards: Card[] | null;
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = await getUserIdFromAuth(req.headers.authorization ?? null);
   if (!userId) {
@@ -27,23 +40,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Failed to fetch inventory' });
     }
 
-    const rows = (data ?? []).map(
-      (row: {
-        cards: Record<string, unknown>;
-        card_id: string;
-        quantity: number;
-      }) => ({
-        ...(row.cards as Record<string, unknown>),
-        quantity: row.quantity,
+    const rows = (data as InventoryRow[] | null ?? [])
+      .map((row) => {
+        const card = row.cards?.[0];
+        if (!card) return null;
+        return { ...card, quantity: row.quantity };
       })
-    );
+      .filter(Boolean);
+
     return res.json(rows);
   }
 
   if (req.method === 'DELETE') {
-    const card_id = (req.body?.card_id ?? req.query?.card_id) as
-      | string
-      | undefined;
+    const card_id = (req.body?.card_id ?? req.query?.card_id) as string | undefined;
     if (!card_id) {
       return res.status(400).json({ error: 'card_id is required' });
     }
@@ -61,11 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const newQty = (row.quantity ?? 1) - 1;
     if (newQty <= 0) {
-      await supabase
-        .from('inventory')
-        .delete()
-        .eq('user_id', userId)
-        .eq('card_id', card_id);
+      await supabase.from('inventory').delete().eq('user_id', userId).eq('card_id', card_id);
     } else {
       await supabase
         .from('inventory')
@@ -73,6 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('user_id', userId)
         .eq('card_id', card_id);
     }
+
     return res.json({ success: true });
   }
 
@@ -82,11 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'card_id is required' });
     }
 
-    const { data: card } = await supabase
-      .from('cards')
-      .select('id')
-      .eq('id', card_id)
-      .single();
+    const { data: card } = await supabase.from('cards').select('id').eq('id', card_id).single();
     if (!card) {
       return res.status(404).json({ error: 'Card not found' });
     }
@@ -104,6 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .update({ quantity: existing.quantity + 1 })
         .eq('user_id', userId)
         .eq('card_id', card_id);
+
       if (updateError) {
         console.error('Inventory update error:', updateError);
         return res.status(500).json({ error: 'Failed to add card' });
@@ -112,6 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { error: insertError } = await supabase
         .from('inventory')
         .insert({ user_id: userId, card_id, quantity: 1 });
+
       if (insertError) {
         console.error('Inventory insert error:', insertError);
         return res.status(500).json({ error: 'Failed to add card' });
@@ -130,8 +134,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('card_id', card_id)
       .single();
 
-    const row = updated as { cards: Record<string, unknown>; quantity: number };
-    return res.json({ ...(row?.cards ?? {}), quantity: row?.quantity ?? 1 });
+    const typed = (updated as { quantity: number; cards: Card[] | null } | null) ?? null;
+    const updatedCard = typed?.cards?.[0];
+
+    return res.json({
+      ...(updatedCard ?? {}),
+      quantity: typed?.quantity ?? 1,
+    });
   }
 
   res.setHeader('Allow', 'GET, POST, DELETE');
