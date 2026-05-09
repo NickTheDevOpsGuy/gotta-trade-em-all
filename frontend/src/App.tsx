@@ -20,8 +20,9 @@ import LZString from 'lz-string';
 import { strings } from './lib/i18n';
 import { hapticLight, hapticSuccess } from './lib/haptics';
 import { fetchWithRetry } from './lib/fetchWithRetry';
+import { API_BASE, readJsonResponse } from './lib/api';
 
-const API = import.meta.env.VITE_API_URL ?? '/api';
+const API = API_BASE;
 const APP_VERSION = __APP_VERSION__ ?? '1.0.0';
 
 const themeStyles: Record<
@@ -123,7 +124,7 @@ export default function App() {
     }
   }, []);
 
-  const fetchData = useCallback(() => {
+  const fetchData = useCallback(async () => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -131,38 +132,66 @@ export default function App() {
     setFetching(true);
     setError(null);
     setSessionExpired(false);
-    Promise.all([
-      fetchWithRetry(`${API}/cards`).then((r) => r.json()),
-      fetchWithRetry(`${API}/inventory`, { headers }).then((r) => {
-        check401(r);
-        return r.json();
-      }),
-      token
-        ? fetchWithRetry(`${API}/trades`, { headers })
-            .then((r) => {
-              check401(r);
-              return r.json();
-            })
-            .then((d) => d.trades ?? [])
-            .catch(() => [])
-        : Promise.resolve([]),
-      fetchWithRetry(`${API}/leaderboard`, { headers })
-        .then((r) => r.json())
-        .catch(() => ({ leaderboard: [], yourRank: null })),
-    ])
-      .then(([c, inv, tr, lb]) => {
-        setCards(c);
-        setInventory(inv);
-        setTrades(tr);
-        setLeaderboard(lb.leaderboard ?? []);
-        setYourRank(lb.yourRank ?? null);
-      })
-      .catch((e) => setError(e.message || 'Failed to load data'))
-      .finally(() => setFetching(false));
+    try {
+      const [cardsResponse, inventoryResponse, trades, leaderboard] =
+        await Promise.all([
+          fetchWithRetry(`${API}/cards`),
+          fetchWithRetry(`${API}/inventory`, { headers }),
+          (async () => {
+            if (!token) return [];
+            try {
+              const response = await fetchWithRetry(`${API}/trades`, {
+                headers,
+              });
+              check401(response);
+              const data = await readJsonResponse<{ trades?: TradeRecord[] }>(
+                response,
+                'Failed to load trades'
+              );
+              return data.trades ?? [];
+            } catch {
+              return [];
+            }
+          })(),
+          (async () => {
+            try {
+              const response = await fetchWithRetry(`${API}/leaderboard`, {
+                headers,
+              });
+              return await readJsonResponse<{
+                leaderboard?: {
+                  rank: number;
+                  uniqueCards: number;
+                  totalCards: number;
+                }[];
+                yourRank?: number | null;
+              }>(response, 'Failed to load leaderboard');
+            } catch {
+              return { leaderboard: [], yourRank: null };
+            }
+          })(),
+        ]);
+
+      check401(inventoryResponse);
+      const [cards, inventory] = await Promise.all([
+        readJsonResponse<Card[]>(cardsResponse, 'Failed to load cards'),
+        readJsonResponse<Card[]>(inventoryResponse, 'Failed to load inventory'),
+      ]);
+
+      setCards(cards);
+      setInventory(inventory);
+      setTrades(trades);
+      setLeaderboard(leaderboard.leaderboard ?? []);
+      setYourRank(leaderboard.yourRank ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load data');
+    } finally {
+      setFetching(false);
+    }
   }, [token, check401]);
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData, token]);
 
   useEffect(() => {
@@ -213,28 +242,36 @@ export default function App() {
           Authorization: `Bearer ${token}`,
         };
         setImporting(true);
-        fetch(`${API}/inventory/import`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ items: payload }),
-        })
-          .then((r) =>
-            r.ok
-              ? fetchData()
-              : r.json().then((e) => {
-                  throw new Error(e.error);
-                })
-          )
-          .then(() => {
+        void (async () => {
+          try {
+            const response = await fetch(`${API}/inventory/import`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ items: payload }),
+            });
+            if (!response.ok) {
+              const error = await readJsonResponse<{ error?: string }>(
+                response,
+                'Failed to import shared collection'
+              );
+              throw new Error(error.error);
+            }
+            await fetchData();
             addToast(
               `Imported shared collection (${payload.length} cards)`,
               'success'
             );
             window.history.replaceState({}, '', window.location.pathname);
             window.location.hash = '';
-          })
-          .catch((err) => addToast(err.message, 'error'))
-          .finally(() => setImporting(false));
+          } catch (err) {
+            addToast(
+              err instanceof Error ? err.message : 'Import failed',
+              'error'
+            );
+          } finally {
+            setImporting(false);
+          }
+        })();
       }
     } catch {
       sharedLinkHandled.current = false;
@@ -265,40 +302,41 @@ export default function App() {
   }, [playClick, showHelp, closeHelp]);
 
   const handleAddCard = useCallback(
-    (card: Card) => {
+    async (card: Card) => {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      fetch(`${API}/inventory`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ card_id: card.id }),
-      })
-        .then((r) => {
-          check401(r);
-          if (!r.ok)
-            return r.json().then((e) => {
-              throw new Error(e.error || 'Failed to add');
-            });
-          return r.json();
-        })
-        .then(() => {
-          hapticSuccess();
-          playAdd();
-          setLastAddedCard(card);
-          addToast(`Added ${card.name} to collection`, 'success');
-          fetchData();
-        })
-        .catch((e) => {
-          setError(e.message);
-          addToast(e.message, 'error');
+      try {
+        const response = await fetch(`${API}/inventory`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ card_id: card.id }),
         });
+        check401(response);
+        if (!response.ok) {
+          const error = await readJsonResponse<{ error?: string }>(
+            response,
+            'Failed to add'
+          );
+          throw new Error(error.error || 'Failed to add');
+        }
+        await readJsonResponse(response, 'Failed to add');
+        hapticSuccess();
+        playAdd();
+        setLastAddedCard(card);
+        addToast(`Added ${card.name} to collection`, 'success');
+        await fetchData();
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Failed to add';
+        setError(message);
+        addToast(message, 'error');
+      }
     },
     [fetchData, token, playAdd, addToast, check401]
   );
 
-  const handleUndoAdd = useCallback(() => {
+  const handleUndoAdd = useCallback(async () => {
     if (!lastAddedCard || !token) return;
     const cardName = lastAddedCard.name;
     hapticLight();
@@ -306,25 +344,27 @@ export default function App() {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     };
-    fetch(`${API}/inventory`, {
-      method: 'DELETE',
-      headers,
-      body: JSON.stringify({ card_id: lastAddedCard.id }),
-    })
-      .then((r) => {
-        check401(r);
-        if (!r.ok)
-          return r.json().then((e) => {
-            throw new Error(e.error);
-          });
-        return r.json();
-      })
-      .then(() => {
-        setLastAddedCard(null);
-        addToast(`Undid add: ${cardName}`, 'info');
-        fetchData();
-      })
-      .catch((e) => addToast(e.message, 'error'));
+    try {
+      const response = await fetch(`${API}/inventory`, {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify({ card_id: lastAddedCard.id }),
+      });
+      check401(response);
+      if (!response.ok) {
+        const error = await readJsonResponse<{ error?: string }>(
+          response,
+          'Failed to undo add'
+        );
+        throw new Error(error.error);
+      }
+      await readJsonResponse(response, 'Failed to undo add');
+      setLastAddedCard(null);
+      addToast(`Undid add: ${cardName}`, 'info');
+      await fetchData();
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Failed to undo add', 'error');
+    }
   }, [lastAddedCard, token, fetchData, addToast, check401]);
 
   const handleToggleTradeSelect = useCallback(
@@ -341,7 +381,7 @@ export default function App() {
     [playClick]
   );
 
-  const handleTrade = useCallback(() => {
+  const handleTrade = useCallback(async () => {
     if (tradeSelection.size === 0) {
       addToast('Select at least one card to trade', 'error');
       return;
@@ -352,40 +392,48 @@ export default function App() {
       'Content-Type': 'application/json',
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    fetch(`${API}/inventory/trade`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ offer_card_ids: Array.from(tradeSelection) }),
-    })
-      .then((r) => {
-        check401(r);
-        if (r.status === 429)
-          return r.json().then((e) => {
-            throw new Error(e.error || 'Too many trades');
-          });
-        if (!r.ok)
-          return r.json().then((e) => {
-            throw new Error(e.error || 'Trade failed');
-          });
-        return r.json();
-      })
-      .then((data) => {
-        hapticSuccess();
-        playTrade();
-        setLastAddedCard(null);
-        const count = data.received?.length ?? 0;
-        addToast(
-          `Traded for ${count} new card${count !== 1 ? 's' : ''}!`,
-          'success'
+    try {
+      const response = await fetch(`${API}/inventory/trade`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ offer_card_ids: Array.from(tradeSelection) }),
+      });
+      check401(response);
+      if (response.status === 429) {
+        const error = await readJsonResponse<{ error?: string }>(
+          response,
+          'Too many trades'
         );
-        setTradeSelection(new Set());
-        fetchData();
-      })
-      .catch((e) => {
-        setError(e.message);
-        addToast(e.message, 'error');
-      })
-      .finally(() => setTrading(false));
+        throw new Error(error.error || 'Too many trades');
+      }
+      if (!response.ok) {
+        const error = await readJsonResponse<{ error?: string }>(
+          response,
+          'Trade failed'
+        );
+        throw new Error(error.error || 'Trade failed');
+      }
+      const data = await readJsonResponse<{ received?: Card[] }>(
+        response,
+        'Trade failed'
+      );
+      hapticSuccess();
+      playTrade();
+      setLastAddedCard(null);
+      const count = data.received?.length ?? 0;
+      addToast(
+        `Traded for ${count} new card${count !== 1 ? 's' : ''}!`,
+        'success'
+      );
+      setTradeSelection(new Set());
+      await fetchData();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Trade failed';
+      setError(message);
+      addToast(message, 'error');
+    } finally {
+      setTrading(false);
+    }
   }, [tradeSelection, fetchData, token, playTrade, addToast, check401]);
 
   const catalogFiltered = useMemo(() => {
@@ -450,19 +498,19 @@ export default function App() {
     setExporting(false);
   }, [inventory, addToast]);
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     const compressed = LZString.compressToEncodedURIComponent(
       JSON.stringify(inventory)
     );
     const url = `${window.location.origin}/share#${compressed}`;
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        setShareCopied(true);
-        addToast(strings.actions.copied, 'success');
-        setTimeout(() => setShareCopied(false), 2000);
-      })
-      .catch(() => addToast('Could not copy', 'error'));
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      addToast(strings.actions.copied, 'success');
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      addToast('Could not copy', 'error');
+    }
   }, [inventory, addToast]);
 
   const handleImport = useCallback(
@@ -498,24 +546,32 @@ export default function App() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           };
-          fetch(`${API}/inventory/import`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ items: payload }),
-          })
-            .then((r) => {
-              check401(r);
-              return r.ok
-                ? fetchData()
-                : r.json().then((e) => {
-                    throw new Error(e.error);
-                  });
-            })
-            .then(() =>
-              addToast(`Imported ${payload.length} card(s)`, 'success')
-            )
-            .catch((err) => addToast(err.message, 'error'))
-            .finally(() => setImporting(false));
+          void (async () => {
+            try {
+              const response = await fetch(`${API}/inventory/import`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ items: payload }),
+              });
+              check401(response);
+              if (!response.ok) {
+                const error = await readJsonResponse<{ error?: string }>(
+                  response,
+                  'Failed to import collection'
+                );
+                throw new Error(error.error);
+              }
+              await fetchData();
+              addToast(`Imported ${payload.length} card(s)`, 'success');
+            } catch (err) {
+              addToast(
+                err instanceof Error ? err.message : 'Import failed',
+                'error'
+              );
+            } finally {
+              setImporting(false);
+            }
+          })();
         } catch {
           addToast('Invalid file format', 'error');
         }

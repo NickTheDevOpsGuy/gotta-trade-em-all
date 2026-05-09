@@ -15,22 +15,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session) {
-        supabase.auth.signInAnonymously().then(({ data: { session: s } }) => {
-          setSession(s ?? null);
-        });
+    let cancelled = false;
+
+    async function initializeSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (cancelled) return;
+        setSession(session);
+
+        if (!session) {
+          const {
+            data: { session: anonymousSession },
+          } = await supabase.auth.signInAnonymously();
+
+          if (!cancelled) setSession(anonymousSession ?? null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
-    });
+    }
+
+    void initializeSession();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
