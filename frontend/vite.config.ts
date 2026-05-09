@@ -7,6 +7,7 @@ import pkg from './package.json';
 export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(pkg.version ?? '1.0.0') },
   build: {
+    outDir: 'dist',
     rollupOptions: {
       output: {
         manualChunks: undefined,

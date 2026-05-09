@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --outDir dist",
     "build:frontend": "npm run build",
     "build:analyze": "ANALYZE=1 tsc && vite build",
     "preview": "vite preview",
